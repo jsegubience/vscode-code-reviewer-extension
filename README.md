@@ -9,20 +9,33 @@ An intelligent VS Code extension that leverages GitHub Copilot to perform automa
 ⚡ **Instant Feedback**: Get reviews in seconds with simple hotkey commands
 📝 **Detailed Reports**: Formatted markdown reports with actionable suggestions
 🎯 **Flexible Targeting**: Review latest commit or specify any commit hash
+⚙️ **Configurable Settings**: Adjust the diff truncation limit to optimize token usage
 
-## Prerequisites
+## Configuration
 
-- **VS Code 1.90.0 or higher**
-- **GitHub Copilot subscription** and extension installed
-- **Git repository** in your workspace
+The extension provides a configurable setting to control the maximum number of characters included in the diff for code reviews. This helps optimize token usage and ensures that reviews remain efficient, even for large commits.
 
-## Installation
-
-1. Clone this repository or download the VSIX package
-2. Install the extension in VS Code
-3. Ensure GitHub Copilot is installed and authenticated
+### Setting: `copilotCodeReview.diffTruncationLimit`
+- **Description**: Specifies the maximum number of characters to include in the diff sent to GitHub Copilot for review.
+- **Default**: 5000 characters
+- **How It Works**: The extension truncates the diff to the specified limit before sending it to GitHub Copilot. This ensures that the review remains within token limits while focusing on the most relevant changes.
+- **How to Configure**:
+  1. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
+  2. Type `Preferences: Open Settings (JSON)` and select it.
+  3. Add or update the following setting:
+     ```json
+     "copilotCodeReview.diffTruncationLimit": 7000
+     ```
+  4. Save the file.
 
 ## Usage
+
+### Ideal Number of Commits for Review
+When reviewing multiple commits, it is recommended to limit the number of commits to **5 or fewer** at a time. This ensures that:
+- The review process remains efficient and does not exceed token limits.
+- Each commit receives adequate attention during the review.
+
+If you need to review more than 5 commits, consider splitting them into smaller batches for better results.
 
 ### Review Latest Commit
 - **Command**: `Review Latest Commit with Copilot`
@@ -98,14 +111,6 @@ src/
 └── types/
     └── index.ts                # TypeScript type definitions
 ```
-
-## Configuration
-
-The extension works out of the box with GitHub Copilot. Ensure:
-
-1. GitHub Copilot extension is installed
-2. You're signed into GitHub Copilot
-3. Your workspace contains a Git repository
 
 ## Troubleshooting
 
