@@ -4,6 +4,10 @@
   "description": "An extension that utilizes GitHub Copilot to perform automated code reviews on Git commits.",
   "version": "0.1.0",
   "publisher": "MantleDevs",
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab-ssh.actech.cambridge.org:JC/vscode-copilot-code-reviewer-extension.git"
+  },
   "categories": ["Other"],
   "engines": {
     "vscode": "^1.90.0"
