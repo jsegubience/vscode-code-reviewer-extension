@@ -9,8 +9,8 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone [YOUR_REPO_URL]
-   cd vscode-copilot-code-review
+   git clone git@gitlab-ssh.actech.cambridge.org:JC/vscode-copilot-code-reviewer-extension.git
+   cd vscode-copilot-code-reviewer-extension
    ```
 
 2. **Install dependencies:**
