@@ -1,1 +1,0 @@
-{"version":3,"file":"copilotProvider.d.ts","sourceRoot":"","sources":["../../src/providers/copilotProvider.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,MAAM,EAAE,YAAY,EAAe,MAAM,UAAU,CAAC;AAE7D,qBAAa,eAAe;IAClB,YAAY,CAAC,MAAM,EAAE,MAAM,GAAG,OAAO,CAAC,YAAY,GAAG,IAAI,CAAC;IAqChE,OAAO,CAAC,kBAAkB;IAyD1B,OAAO,CAAC,mBAAmB;CAsC9B"}

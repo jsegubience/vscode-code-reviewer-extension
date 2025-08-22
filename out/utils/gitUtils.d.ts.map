@@ -1,1 +1,0 @@
-{"version":3,"file":"gitUtils.d.ts","sourceRoot":"","sources":["../../src/utils/gitUtils.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,MAAM,EAAE,MAAM,UAAU,CAAC;AAElC,wBAAsB,eAAe,IAAI,OAAO,CAAC,MAAM,GAAG,IAAI,CAAC,CAmC9D;AAED,wBAAsB,eAAe,CAAC,UAAU,EAAE,MAAM,GAAG,OAAO,CAAC,MAAM,GAAG,IAAI,CAAC,CA0ChF;AAED,wBAAgB,qBAAqB,IAAI,OAAO,CAc/C"}
