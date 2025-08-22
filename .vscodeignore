@@ -1,0 +1,14 @@
+# The contents of the file /vscode-copilot-code-review/vscode-copilot-code-review/.vscodeignore
+
+.vscode/
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+*.map
+*.test.ts
+*.spec.ts
+coverage/
+*.tgz
+.DS_Store
+.vscode-test/
