@@ -30,8 +30,9 @@
 
 5. **Install in VS Code:**
    ```bash
-   code --install-extension vscode-copilot-code-review-0.1.0.vsix
+   code --install-extension vscode-copilot-code-review-<version>.vsix
    ```
+   Replace `<version>` with the version number from the `package.json` file (e.g., `0.2.0`).
 
 ## Quick Installation from VSIX
 
