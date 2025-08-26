@@ -4,6 +4,7 @@ stages:
 
 build_extension:
   stage: build
+  image: node:22-alpine
   script:
     - npm install
     - npm run compile
