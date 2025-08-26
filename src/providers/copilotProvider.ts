@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { Commit, ReviewResult, ReviewIssue } from '../types';
 
 export class CopilotProvider {
     async reviewCommit(commit: Commit): Promise<ReviewResult | null> {
         try {
             // Create a comprehensive prompt for Copilot
-            const prompt = this.createReviewPrompt(commit);
+            const prompt = await this.createReviewPrompt(commit);
 
             // Get available language models (requires GitHub Copilot)
             const models = await vscode.lm.selectChatModels({
@@ -39,7 +40,23 @@ export class CopilotProvider {
         }
     }
 
-    private createReviewPrompt(commit: Commit): string {
+    private async createReviewPrompt(commit: Commit): Promise<string> {
+        let codingStandard = '';
+
+        // Fetch the coding standard file path from the configuration
+        const config = vscode.workspace.getConfiguration('copilotCodeReview');
+        const codingStandardPath = config.get<string>('codingStandardPath', '');
+
+        // Read the coding standard file if the path is provided
+        if (codingStandardPath) {
+            try {
+                codingStandard = fs.readFileSync(codingStandardPath, 'utf-8');
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showWarningMessage(`Optional coding standard file could not be read: ${errorMessage}`);
+            }
+        }
+
         return `Please perform a comprehensive code review of this Git commit. For each area below, identify specific issues AND provide concrete fixes:
 
 1. **Code Quality**: Best practices, code style, and maintainability
@@ -75,6 +92,8 @@ ${commit.files.join('\n')}
 \`\`\`
 ${commit.diff}
 \`\`\`
+
+${codingStandard ? `**Custom Coding Standard:**\n${codingStandard}\n` : ''}
 
 Please provide your review in the following JSON format with SPECIFIC, ACTIONABLE fixes:
 {

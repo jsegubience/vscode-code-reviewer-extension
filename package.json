@@ -2,7 +2,7 @@
   "name": "vscode-copilot-code-review",
   "displayName": "Copilot Code Reviewer",
   "description": "An extension that utilizes GitHub Copilot to perform automated code reviews on Git commits.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "MantleDevs",
   "repository": {
     "type": "git",
@@ -44,6 +44,11 @@
           "type": "number",
           "default": 5000,
           "description": "The maximum number of characters to include in the diff for code review."
+        },
+        "copilotCodeReview.codingStandardPath": {
+          "type": "string",
+          "default": "",
+          "description": "(Optional) Path to a custom coding standard file (e.g., .md or .txt) to include in code reviews. Leave empty to skip."
         }
       }
     }
