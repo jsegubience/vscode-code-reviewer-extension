@@ -1,0 +1,65 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22'
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Build Extension
+      run: npm run compile
+
+    - name: Package Extension
+      run: npx @vscode/vsce package
+
+    - name: Check if Release Exists
+      id: check_release
+      run: |
+        curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+        https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} \
+        | jq -r '.id' > release_id.txt
+        if [ "$(cat release_id.txt)" != "null" ]; then
+          echo "exists=true" >> $GITHUB_ENV
+        else
+          echo "exists=false" >> $GITHUB_ENV
+        fi
+
+    - name: Extract Version and Set VSIX File Name
+      id: set_vsix_name
+      run: |
+        VERSION=$(echo "${GITHUB_REF##*/}" | sed 's/^v//')
+        echo "vsix_file=vscode-copilot-code-review-${VERSION}.vsix" >> $GITHUB_ENV
+
+    - name: Create GitHub Release
+      if: env.exists == 'false'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          Automated release for version ${{ github.ref_name }}.
+        draft: false
+        prerelease: false
+        files: ./${{ env.vsix_file }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
