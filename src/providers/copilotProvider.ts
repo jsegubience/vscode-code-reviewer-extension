@@ -93,7 +93,7 @@ ${commit.files.join('\n')}
 ${commit.diff}
 \`\`\`
 
-${codingStandard ? `**Custom Coding Standard:**\n${codingStandard}\n` : ''}
+${codingStandard ? `**Custom Coding Standard:**\n${codingStandard}\n` : 'No specific coding standard is being enforced for this review.'}
 
 Please provide your review in the following JSON format with SPECIFIC, ACTIONABLE fixes:
 {

@@ -2,7 +2,7 @@
   "name": "vscode-copilot-code-review",
   "displayName": "Copilot Code Reviewer",
   "description": "An extension that utilizes GitHub Copilot to perform automated code reviews on Git commits.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "MantleDevs",
   "repository": {
     "type": "git",
