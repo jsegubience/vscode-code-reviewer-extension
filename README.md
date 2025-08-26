@@ -4,16 +4,16 @@ An intelligent VS Code extension that leverages GitHub Copilot to perform automa
 
 ## Features
 
-✨ **AI-Powered Reviews**: Uses GitHub Copilot to analyze your code changes
-🔍 **Comprehensive Analysis**: Covers code quality, security, performance, and maintainability
-⚡ **Instant Feedback**: Get reviews in seconds with simple hotkey commands
-📝 **Detailed Reports**: Formatted markdown reports with actionable suggestions
-🎯 **Flexible Targeting**: Review latest commit or specify any commit hash
-⚙️ **Configurable Settings**: Adjust the diff truncation limit to optimize token usage
+- ✨ **AI-Powered Reviews**: Uses GitHub Copilot to analyze your code changes
+- 🔍 **Comprehensive Analysis**: Covers code quality, security, performance, and maintainability
+- ⚡ **Instant Feedback**: Get reviews in seconds with simple hotkey commands
+- 📝 **Detailed Reports**: Formatted markdown reports with actionable suggestions
+- 🎯 **Flexible Targeting**: Review latest commit or specify any commit hash
+- ⚙️ **Configurable Settings**: Adjust the diff truncation limit to optimize token usage
 
 ## Configuration
 
-The extension provides a configurable setting to control the maximum number of characters included in the diff for code reviews. This helps optimize token usage and ensures that reviews remain efficient, even for large commits.
+The extension provides configurable settings to enhance your experience. Below are the available options:
 
 ### Setting: `copilotCodeReview.diffTruncationLimit`
 - **Description**: Specifies the maximum number of characters to include in the diff sent to GitHub Copilot for review.
@@ -25,6 +25,19 @@ The extension provides a configurable setting to control the maximum number of c
   3. Add or update the following setting:
      ```json
      "copilotCodeReview.diffTruncationLimit": 7000
+     ```
+  4. Save the file.
+
+### Setting: `copilotCodeReview.codingStandardPath`
+- **Description**: Specifies the file path to a custom coding standard to be included in the review prompt.
+- **Default**: Empty (no coding standard enforced)
+- **How It Works**: If a valid file path is provided, the content of the file is included in the review prompt as a reference for GitHub Copilot. This ensures that reviews align with your team's coding standards.
+- **How to Configure**:
+  1. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
+  2. Type `Preferences: Open Settings (JSON)` and select it.
+  3. Add or update the following setting:
+     ```json
+     "copilotCodeReview.codingStandardPath": "/path/to/your/coding-standard.md"
      ```
   4. Save the file.
 
