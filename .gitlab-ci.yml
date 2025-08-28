@@ -1,31 +1,68 @@
 stages:
   - build
+  - prepare
   - release
 
+variables:
+  NODE_VERSION: "22"
+
+# Build and package the extension
 build_extension:
   stage: build
-  image: node:22-alpine
+  image: node:${NODE_VERSION}-alpine
+  rules:
+    - if: $CI_COMMIT_TAG                             # Only run when a tag is created
   script:
+    - echo "Building VS Code extension..."
     - npm install
     - npm run compile
     - npx @vscode/vsce package
   artifacts:
     paths:
-      - vscode-copilot-code-review-*.vsix
-  only:
-      - tags
+      - "vscode-copilot-code-review-*.vsix"
+    expire_in: 1 hour
 
+# Prepare release variables
+prepare_job:
+  stage: prepare
+  needs:
+    - job: build_extension
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG                             # Only run when a tag is created
+  script:
+    - echo "Preparing release variables..."
+    # Extract version from package.json
+    - VERSION=$(grep '"version"' package.json | cut -d'"' -f4)
+    - echo "TAG=v$VERSION" >> variables.env
+    - echo "VSIX_FILE=vscode-copilot-code-review-$VERSION.vsix" >> variables.env
+    - echo "RELEASE_DESCRIPTION=Automated release for version v$VERSION of the VS Code Copilot Code Review Extension." >> variables.env
+  artifacts:
+    reports:
+      dotenv: variables.env
+    paths:
+      - "vscode-copilot-code-review-*.vsix"
+    expire_in: 1 hour
+
+# Create GitLab release using the modern release syntax
 release:
   stage: release
-  image: curlimages/curl:latest # Adding a Docker image with curl
+  image: alpine:latest
+  needs:
+    - job: prepare_job
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG                             # Only run when a tag is created
   script:
-    - |
-      curl --request POST --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-      --form "name=Release $CI_COMMIT_TAG" \
-      --form "tag_name=$CI_COMMIT_TAG" \
-      --form "description=Automated release for $CI_COMMIT_TAG" \
-      --form "assets[links][][name]=VSIX File" \
-      --form "assets[links][][url]=$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/vscode-copilot-code-review-0.2.1.vsix" \
-      "https://gitlab.actech.cambridge.org/api/v4/projects/$CI_PROJECT_ID/releases"
-  only:
-    - tags
+    - "echo 'Creating release for $TAG'"
+    - "echo 'VSIX file: $VSIX_FILE'"
+  release:
+    name: 'Release $TAG'
+    description: '$RELEASE_DESCRIPTION'
+    tag_name: '$TAG'
+    ref: '$CI_COMMIT_SHA'
+    assets:
+      links:
+        - name: '$VSIX_FILE'
+          url: '$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/$VSIX_FILE'
+          link_type: 'package'
