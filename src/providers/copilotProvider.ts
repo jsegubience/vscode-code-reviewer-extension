@@ -3,12 +3,37 @@ import * as fs from 'fs';
 import { Commit, ReviewResult, ReviewIssue } from '../types';
 
 export class CopilotProvider {
+    private static readonly REVIEW_CATEGORIES = {
+        codeQuality: 'Code Quality: Best practices, code style, and maintainability',
+        bugs: 'Potential Bugs: Logic errors, edge cases, and runtime issues', 
+        security: 'Security: Vulnerabilities, unsafe operations, and security best practices',
+        performance: 'Performance: Inefficient algorithms, memory usage, and optimization opportunities',
+        testing: 'Testing: Missing tests, test coverage, and test quality'
+    };
+
     async reviewCommit(commit: Commit): Promise<ReviewResult | null> {
         try {
-            // Create a comprehensive prompt for Copilot
-            const prompt = await this.createReviewPrompt(commit);
+            const model = await this.getCopilotModel();
+            if (!model) return null;
 
-            // Get available language models (requires GitHub Copilot)
+            const prompt = await this.buildReviewPrompt(commit);
+            const response = await this.sendCopilotRequest(model, prompt);
+            
+            return this.parseReviewResponse(commit.hash, response);
+
+        } catch (error) {
+            return this.handleError('reviewing commit', error);
+        }
+    }
+
+    private async getCopilotModel(): Promise<any | null> {
+        try {
+            // Check if the Language Model API is available
+            if (!vscode.lm || !vscode.lm.selectChatModels) {
+                vscode.window.showErrorMessage('Language Model API is not available. Please update VS Code to version 1.91.0 or later.');
+                return null;
+            }
+
             const models = await vscode.lm.selectChatModels({
                 vendor: 'copilot',
                 family: 'gpt-4'
@@ -19,8 +44,16 @@ export class CopilotProvider {
                 return null;
             }
 
-            // Send the review request to Copilot
-            const chatResponse = await models[0].sendRequest([
+            return models[0];
+        } catch (error) {
+            vscode.window.showErrorMessage('Failed to access GitHub Copilot. Please ensure you have the GitHub Copilot extension installed and are authenticated.');
+            return null;
+        }
+    }
+
+    private async sendCopilotRequest(model: any, prompt: string): Promise<string> {
+        try {
+            const chatResponse = await model.sendRequest([
                 vscode.LanguageModelChatMessage.User(prompt)
             ]);
 
@@ -28,58 +61,48 @@ export class CopilotProvider {
             for await (const fragment of chatResponse.text) {
                 response += fragment;
             }
-
-            // Parse the response and create a structured review result
-            return this.parseReviewResponse(commit.hash, response);
-
+            return response;
         } catch (error) {
-            console.error('Error reviewing commit with Copilot:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            vscode.window.showErrorMessage(`Failed to review commit: ${errorMessage}`);
-            return null;
+            throw new Error(`Failed to get response from Copilot: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
-    private async createReviewPrompt(commit: Commit): Promise<string> {
-        let codingStandard = '';
+    private async buildReviewPrompt(commit: Commit): Promise<string> {
+        const codingStandard = await this.loadCodingStandard();
+        
+        return `${this.getReviewInstructions()}
 
-        // Fetch the coding standard file path from the configuration
+${this.formatCommitInfo(commit)}
+
+${this.formatCodingStandard(codingStandard)}
+
+${this.getResponseFormat()}`;
+    }
+    private async loadCodingStandard(): Promise<string> {
         const config = vscode.workspace.getConfiguration('copilotCodeReview');
         const codingStandardPath = config.get<string>('codingStandardPath', '');
 
-        // Read the coding standard file if the path is provided
-        if (codingStandardPath) {
-            try {
-                codingStandard = fs.readFileSync(codingStandardPath, 'utf-8');
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                vscode.window.showWarningMessage(`Optional coding standard file could not be read: ${errorMessage}`);
-            }
-        }
+        if (!codingStandardPath) return '';
 
+        try {
+            return fs.readFileSync(codingStandardPath, 'utf-8');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showWarningMessage(`Optional coding standard file could not be read: ${errorMessage}`);
+            return '';
+        }
+    }
+
+    private getReviewInstructions(): string {
         return `Please perform a comprehensive code review of this Git commit. For each area below, identify specific issues AND provide concrete fixes:
 
-1. **Code Quality**: Best practices, code style, and maintainability
-   - Identify: naming conventions, code structure, readability issues
-   - Suggest: specific refactoring, better naming, architectural improvements
+${Object.entries(CopilotProvider.REVIEW_CATEGORIES)
+    .map(([key, description], index) => `${index + 1}. **${description}**`)
+    .join('\n')}`;
+    }
 
-2. **Potential Bugs**: Logic errors, edge cases, and runtime issues
-   - Identify: null pointer risks, array bounds, error handling gaps
-   - Suggest: specific code changes, validation additions, error handling improvements
-
-3. **Security**: Vulnerabilities, unsafe operations, and security best practices
-   - Identify: injection risks, authentication issues, data exposure
-   - Suggest: specific security measures, input validation, sanitization methods
-
-4. **Performance**: Inefficient algorithms, memory usage, and optimization opportunities
-   - Identify: slow algorithms, memory leaks, unnecessary operations
-   - Suggest: specific optimizations, better algorithms, caching strategies
-
-5. **Testing**: Missing tests, test coverage, and test quality
-   - Identify: untested code paths, missing edge cases, weak assertions
-   - Suggest: specific test cases to add, testing strategies, mock improvements
-
-**Commit Information:**
+    private formatCommitInfo(commit: Commit): string {
+        return `**Commit Information:**
 - Hash: ${commit.hash}
 - Author: ${commit.author}
 - Date: ${commit.date.toISOString()}
@@ -91,11 +114,17 @@ ${commit.files.join('\n')}
 **Diff:**
 \`\`\`
 ${commit.diff}
-\`\`\`
+\`\`\``;
+    }
 
-${codingStandard ? `**Custom Coding Standard:**\n${codingStandard}\n` : 'No specific coding standard is being enforced for this review.'}
+    private formatCodingStandard(codingStandard: string): string {
+        return codingStandard 
+            ? `**Custom Coding Standard:**\n${codingStandard}\n`
+            : 'No specific coding standard is being enforced for this review.';
+    }
 
-Please provide your review in the following JSON format with SPECIFIC, ACTIONABLE fixes:
+    private getResponseFormat(): string {
+        return `Please provide your review in the following JSON format with SPECIFIC, ACTIONABLE fixes:
 {
   "summary": "Brief overview of the changes and overall assessment",
   "overallRating": "good|needs-improvement|major-issues",
@@ -115,42 +144,51 @@ Please provide your review in the following JSON format with SPECIFIC, ACTIONABL
 }`;
     }
 
+    private handleError(operation: string, error: unknown): null {
+        console.error(`Error ${operation} with Copilot:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to ${operation}: ${errorMessage}`);
+        return null;
+    }
+
     private parseReviewResponse(commitHash: string, response: string): ReviewResult {
         try {
-            // Try to extract JSON from the response
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                
-                return {
-                    commitHash,
-                    summary: parsed.summary || 'Review completed',
-                    overallRating: parsed.overallRating || 'good',
-                    issues: parsed.issues || [],
-                    suggestions: parsed.suggestions || []
-                };
+            const parsed = this.extractJsonFromResponse(response);
+            if (parsed) {
+                return this.createReviewResult(commitHash, parsed);
             }
             
-            // Fallback if JSON parsing fails
-            return {
-                commitHash,
-                summary: response.substring(0, 200) + '...',
-                overallRating: 'needs-improvement',
-                issues: [],
-                suggestions: [response]
-            };
+            // Fallback for non-JSON responses
+            return this.createFallbackResult(commitHash, response);
             
         } catch (error) {
             console.error('Error parsing review response:', error);
-            
-            // Return a basic review result with the raw response
-            return {
-                commitHash,
-                summary: 'Review completed with basic analysis',
-                overallRating: 'needs-improvement',
-                issues: [],
-                suggestions: [response]
-            };
+            return this.createFallbackResult(commitHash, response);
         }
+    }
+
+    private extractJsonFromResponse(response: string): any | null {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    }
+
+    private createReviewResult(commitHash: string, parsed: any): ReviewResult {
+        return {
+            commitHash,
+            summary: parsed.summary || 'Review completed',
+            overallRating: parsed.overallRating || 'good',
+            issues: parsed.issues || [],
+            suggestions: parsed.suggestions || []
+        };
+    }
+
+    private createFallbackResult(commitHash: string, response: string): ReviewResult {
+        return {
+            commitHash,
+            summary: response.length > 200 ? response.substring(0, 200) + '...' : response,
+            overallRating: 'needs-improvement',
+            issues: [],
+            suggestions: [response]
+        };
     }
 }
