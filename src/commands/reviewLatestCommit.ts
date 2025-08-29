@@ -40,7 +40,8 @@ async function performCommitReview(
         }
 
         const reviewResult = await analyzeWithCopilot(latestCommit, progress);
-        if (!validateReviewResult(reviewResult)) {
+        if (!reviewResult) {
+            vscode.window.showErrorMessage('Failed to perform code review. Please check that AI model is properly configured.');
             return;
         }
         

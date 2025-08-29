@@ -76,10 +76,11 @@ export function handleError(error: unknown, customMessage: string = 'Error durin
  * Checks if a review result is valid and shows an error if not
  * @param reviewResult The review result to check
  * @returns True if the result is valid, false otherwise
+ * @deprecated Use direct null checking instead for better type safety
  */
 export function validateReviewResult(reviewResult: ReviewResult | null): boolean {
     if (!reviewResult) {
-        vscode.window.showErrorMessage('Failed to perform code review. Please check that GitHub Copilot is properly configured.');
+        vscode.window.showErrorMessage('Failed to perform code review. Please check that AI model is properly configured.');
         return false;
     }
     return true;

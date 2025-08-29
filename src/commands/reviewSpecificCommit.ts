@@ -117,7 +117,8 @@ async function reviewSingleCommit(
         const limitedCommit = truncateCommitDiff(commit, diffLimit);
 
         const reviewResult = await analyzeWithCopilot(limitedCommit, progress);
-        if (!validateReviewResult(reviewResult)) {
+        if (!reviewResult) {
+            vscode.window.showErrorMessage('Failed to perform code review. Please check that AI model is properly configured.');
             return;
         }
         
