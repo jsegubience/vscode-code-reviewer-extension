@@ -29,7 +29,11 @@ jobs:
       run: npm run compile
 
     - name: Package Extension
-      run: npx @vscode/vsce package
+      run: |
+        echo "Packaging extension with GitHub repository information"
+        npx @vscode/vsce package --no-dependencies \
+          --baseContentUrl https://github.com/jsegubience/vscode-code-reviewer-extension/raw/master \
+          --baseImagesUrl https://github.com/jsegubience/vscode-code-reviewer-extension/raw/master
 
     - name: Check if Release Exists
       id: check_release

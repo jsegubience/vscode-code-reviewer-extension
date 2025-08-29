@@ -2,15 +2,31 @@
   "name": "vscode-copilot-code-review",
   "displayName": "AI Code Reviewer",
   "description": "An extension that utilizes AI models to perform automated code reviews on Git commits.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "MantleDevs",
   "repository": {
     "type": "git",
-    "url": "git@gitlab-ssh.actech.cambridge.org:JC/vscode-copilot-code-reviewer-extension.git"
+    "url": "https://github.com/jsegubience/vscode-code-reviewer-extension.git"
   },
+  "homepage": "https://github.com/jsegubience/vscode-code-reviewer-extension",
+  "bugs": {
+    "url": "https://github.com/jsegubience/vscode-code-reviewer-extension/issues"
+  },
+  "icon": "assets/icon.png",
   "categories": ["Other"],
   "engines": {
     "vscode": "^1.91.0"
+  },
+  "keywords": [
+    "code review",
+    "ai",
+    "claude",
+    "git",
+    "commit"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
   },
   "main": "./out/extension.js",
   "contributes": {
