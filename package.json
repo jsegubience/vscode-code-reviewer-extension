@@ -1,7 +1,7 @@
 {
   "name": "vscode-copilot-code-review",
-  "displayName": "Copilot Code Reviewer",
-  "description": "An extension that utilizes GitHub Copilot to perform automated code reviews on Git commits.",
+  "displayName": "AI Code Reviewer",
+  "description": "An extension that utilizes AI models to perform automated code reviews on Git commits.",
   "version": "0.4.0",
   "publisher": "MantleDevs",
   "repository": {
@@ -17,11 +17,11 @@
     "commands": [
       {
         "command": "extension.reviewLatestCommit",
-        "title": "Review Latest Commit with Copilot"
+        "title": "Review Latest Commit with AI"
       },
       {
         "command": "extension.reviewSpecificCommit",
-        "title": "Review Specific Commit with Copilot"
+        "title": "Review Specific Commit with AI"
       }
     ],
     "keybindings": [
@@ -38,7 +38,7 @@
     ],
     "configuration": {
       "type": "object",
-      "title": "Copilot Code Review Configuration",
+      "title": "AI Code Review Configuration",
       "properties": {
         "copilotCodeReview.diffTruncationLimit": {
           "type": "number",
@@ -49,6 +49,12 @@
           "type": "string",
           "default": "",
           "description": "(Optional) Path to a custom coding standard file (e.g., .md or .txt) to include in code reviews. Leave empty to skip."
+        },
+        "copilotCodeReview.preferredModel": {
+          "type": "string",
+          "enum": ["claude", "copilot"],
+          "default": "claude",
+          "description": "The preferred AI model to use for code reviews. 'claude' will try to use any available Claude model (preferring Sonnet if available), while 'copilot' will use your configured Copilot model (which may be GPT-4, GPT-5, etc.)."
         }
       }
     }

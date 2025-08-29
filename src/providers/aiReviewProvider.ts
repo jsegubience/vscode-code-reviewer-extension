@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { Commit, ReviewResult, ReviewIssue } from '../types';
 
-export class CopilotProvider {
+export class AIReviewProvider {
     private static readonly REVIEW_CATEGORIES = {
         codeQuality: 'Code Quality: Best practices, code style, and maintainability',
         bugs: 'Potential Bugs: Logic errors, edge cases, and runtime issues', 
@@ -13,11 +13,14 @@ export class CopilotProvider {
 
     async reviewCommit(commit: Commit): Promise<ReviewResult | null> {
         try {
-            const model = await this.getCopilotModel();
+            const model = await this.getLanguageModel();
             if (!model) return null;
 
+            // Show which model is being used
+            this.logSelectedModel(model);
+
             const prompt = await this.buildReviewPrompt(commit);
-            const response = await this.sendCopilotRequest(model, prompt);
+            const response = await this.sendModelRequest(model, prompt);
             
             return this.parseReviewResponse(commit.hash, response);
 
@@ -25,33 +28,72 @@ export class CopilotProvider {
             return this.handleError('reviewing commit', error);
         }
     }
+    
+    /**
+     * Logs information about the selected model and shows it briefly in the status bar
+     * @param model The selected language model
+     */
+    private logSelectedModel(model: any): void {
+        const modelInfo = model.name || 'Unknown model';
+        const vendorInfo = model.vendor || 'Unknown vendor';
+        const modelMessage = `Using AI model: ${modelInfo} (${vendorInfo})`;
+        
+        console.log(modelMessage);
+        
+        // Show in status bar temporarily
+        vscode.window.setStatusBarMessage(modelMessage, 5000);
+    }
 
-    private async getCopilotModel(): Promise<any | null> {
+    private async getLanguageModel(): Promise<any | null> {
         try {
             // Check if the Language Model API is available
             if (!vscode.lm || !vscode.lm.selectChatModels) {
                 vscode.window.showErrorMessage('Language Model API is not available. Please update VS Code to version 1.91.0 or later.');
                 return null;
             }
-
-            const models = await vscode.lm.selectChatModels({
-                vendor: 'copilot',
-                family: 'gpt-4'
+            
+            // Get the preferred model from configuration
+            const config = vscode.workspace.getConfiguration('copilotCodeReview');
+            const preferredModel = config.get<string>('preferredModel', 'claude');
+            
+            // Get available models based on user preference
+            if (preferredModel === 'claude') {
+                // Try to use any Claude model, without specifying an exact version
+                const claudeModels = await vscode.lm.selectChatModels({
+                    vendor: 'anthropic',
+                });
+                
+                if (claudeModels.length > 0) {
+                    // If multiple Claude models are available, prefer Sonnet or the latest available
+                    const sonnetModel = claudeModels.find(model => 
+                        model.name.toLowerCase().includes('sonnet')
+                    );
+                    
+                    return sonnetModel || claudeModels[0];
+                }
+                
+                // If Claude is not available, fall back to user's Copilot model
+                vscode.window.showInformationMessage('No Claude models are available, falling back to your configured Copilot model.');
+            }
+            
+            // Try user's configured Copilot model (will include GPT-5 if user has it configured)
+            const copilotModels = await vscode.lm.selectChatModels({
+                vendor: 'copilot'
             });
 
-            if (models.length === 0) {
-                vscode.window.showErrorMessage('GitHub Copilot is not available. Please ensure Copilot is installed and authenticated.');
+            if (copilotModels.length === 0) {
+                vscode.window.showErrorMessage('No compatible language models are available. Please ensure you have the appropriate extensions installed and authenticated.');
                 return null;
             }
 
-            return models[0];
+            return copilotModels[0];
         } catch (error) {
-            vscode.window.showErrorMessage('Failed to access GitHub Copilot. Please ensure you have the GitHub Copilot extension installed and are authenticated.');
+            vscode.window.showErrorMessage('Failed to access language models. Please ensure you have the required extensions installed and are authenticated.');
             return null;
         }
     }
 
-    private async sendCopilotRequest(model: any, prompt: string): Promise<string> {
+    private async sendModelRequest(model: any, prompt: string): Promise<string> {
         try {
             const chatResponse = await model.sendRequest([
                 vscode.LanguageModelChatMessage.User(prompt)
@@ -63,7 +105,7 @@ export class CopilotProvider {
             }
             return response;
         } catch (error) {
-            throw new Error(`Failed to get response from Copilot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw new Error(`Failed to get response from AI model: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
@@ -96,7 +138,7 @@ ${this.getResponseFormat()}`;
     private getReviewInstructions(): string {
         return `Please perform a comprehensive code review of this Git commit. For each area below, identify specific issues AND provide concrete fixes:
 
-${Object.entries(CopilotProvider.REVIEW_CATEGORIES)
+${Object.entries(AIReviewProvider.REVIEW_CATEGORIES)
     .map(([key, description], index) => `${index + 1}. **${description}**`)
     .join('\n')}`;
     }
@@ -145,7 +187,7 @@ ${commit.diff}
     }
 
     private handleError(operation: string, error: unknown): null {
-        console.error(`Error ${operation} with Copilot:`, error);
+        console.error(`Error ${operation} with AI model:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         vscode.window.showErrorMessage(`Failed to ${operation}: ${errorMessage}`);
         return null;
