@@ -1,8 +1,8 @@
-# 🤖 VSCode Copilot Code Review Extension
+# 🤖 VSCode AI-Powered Code Review Extension
 
-> An intelligent VS Code extension that leverages GitHub Copilot to perform automated code reviews on Git commits.
+> An intelligent VS Code extension that leverages AI models (Claude and GitHub Copilot) to perform automated code reviews on Git commits.
 
-[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/jsegubience/vscode-code-reviewer-extension/releases)
+[![Version](https://img.shields.io/github/v/release/jsegubience/vscode-code-reviewer-extension?label=version&color=blue)](https://github.com/jsegubience/vscode-code-reviewer-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.90.0+-blue.svg)](https://code.visualstudio.com/)
 
@@ -12,7 +12,7 @@ Get instant, AI-powered feedback on your code changes with comprehensive analysi
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **AI-Powered Reviews** | Uses GitHub Copilot to analyze your code changes |
+| 🧠 **AI-Powered Reviews** | Uses Claude (preferred) or GitHub Copilot to analyze your code changes |
 | 🔍 **Comprehensive Analysis** | Covers code quality, security, performance, and maintainability |
 | ⚡ **Instant Feedback** | Get reviews in seconds with simple hotkey commands |
 | 📝 **Detailed Reports** | Formatted markdown reports with actionable suggestions |
@@ -40,8 +40,8 @@ See the [INSTALL.md](INSTALL.md) file for detailed manual installation instructi
 ### Usage
 | Action | Hotkey | Command |
 |--------|--------|---------|
-| Review Latest Commit | `Ctrl+Alt+J` | `Review Latest Commit with Copilot` |
-| Review Specific Commit | `Ctrl+Alt+K` | `Review Specific Commit with Copilot` |
+| Review Latest Commit | `Ctrl+Alt+J` | `Review Latest Commit with AI` |
+| Review Specific Commit | `Ctrl+Alt+K` | `Review Specific Commit with AI` |
 
 <!-- Add usage screenshots here -->
 ![Usage Example](assets/hotkeys.png)
@@ -161,6 +161,23 @@ npm run watch
 </details>
 
 <details>
+<summary><b>🧩 Component Overview</b></summary>
+
+- **extension.ts**: Registers commands and activates the extension
+- **commands/**
+  - **reviewLatestCommit.ts**: Handles reviewing the most recent commit
+  - **reviewSpecificCommit.ts**: Allows reviewing user-selected commits
+- **providers/**
+  - **aiReviewProvider.ts**: Manages AI model selection with preference for Claude models, falling back to GPT models when needed
+- **utils/**
+  - **commitReviewService.ts**: Shared service for commit review functionality across commands
+  - **gitUtils.ts**: Git operations like fetching commits and diffs
+  - **reviewPresentation.ts**: Formats and displays review results in VS Code
+- **types/**
+  - **index.ts**: Type definitions used throughout the extension
+</details>
+
+<details>
 <summary><b>📁 Project Structure</b></summary>
 
 ```
@@ -170,22 +187,24 @@ src/
 │   ├── reviewLatestCommit.ts   # Latest commit review
 │   └── reviewSpecificCommit.ts # Specific commit review
 ├── providers/
-│   └── copilotProvider.ts      # GitHub Copilot integration
+│   └── aiReviewProvider.ts     # AI model integration (supports both Claude and Copilot)
 ├── utils/
-│   ├── gitUtils.ts            # Git operations
-│   └── reviewUtils.ts         # Review formatting
+│   ├── commitReviewService.ts  # Shared commit review functionality
+│   ├── gitUtils.ts             # Git operations
+│   └── reviewPresentation.ts   # Review formatting and display
 └── types/
-    └── index.ts               # TypeScript definitions
+    └── index.ts                # TypeScript definitions
 ```
 </details>
 
 ## 🔧 Troubleshooting
 
 <details>
-<summary><b>❌ "GitHub Copilot is not available"</b></summary>
+<summary><b>❌ "No AI model available"</b></summary>
 
-- ✅ Install and authenticate GitHub Copilot extension
-- ✅ Check your Copilot subscription status  
+- ✅ Extension now supports both Claude and GitHub Copilot models
+- ✅ Install and authenticate either Claude or GitHub Copilot extensions
+- ✅ Check your AI model subscription status  
 - ✅ Restart VS Code and try again
 </details>
 
