@@ -38,7 +38,12 @@ export class AIReviewProvider {
         const vendorInfo = model.vendor || 'Unknown vendor';
         const modelMessage = `Using AI model: ${modelInfo} (${vendorInfo})`;
         
-        console.log(modelMessage);
+        console.log('Model selection details:', {
+            name: model.name,
+            vendor: model.vendor,
+            vendorDetails: model.vendorDetails || {},
+            additionalProperties: Object.keys(model)
+        });
         
         // Show in status bar temporarily
         vscode.window.setStatusBarMessage(modelMessage, 5000);
@@ -52,16 +57,28 @@ export class AIReviewProvider {
                 return null;
             }
             
+            // Get all available models first to make a more informed decision
+            const allAvailableModels = await vscode.lm.selectChatModels({});
+            
+            if (allAvailableModels.length === 0) {
+                vscode.window.showErrorMessage('No language models are available. Please ensure you have the appropriate extensions installed and authenticated.');
+                return null;
+            }
+            
             // Get the preferred model from configuration
             const config = vscode.workspace.getConfiguration('copilotCodeReview');
             const preferredModel = config.get<string>('preferredModel', 'claude');
             
-            // Get available models based on user preference
+            // Log available models for debugging
+            console.log('Available models:', allAvailableModels.map(m => `${m.name} (${m.vendor})`).join(', '));
+            
+            // Check for Claude models among all available models
             if (preferredModel === 'claude') {
-                // Try to use any Claude model, without specifying an exact version
-                const claudeModels = await vscode.lm.selectChatModels({
-                    vendor: 'anthropic',
-                });
+                // Look for Claude models in all available models
+                const claudeModels = allAvailableModels.filter(model => 
+                    model.vendor.toLowerCase() === 'anthropic' || 
+                    model.name.toLowerCase().includes('claude')
+                );
                 
                 if (claudeModels.length > 0) {
                     // If multiple Claude models are available, prefer Sonnet or the latest available
@@ -73,20 +90,21 @@ export class AIReviewProvider {
                 }
                 
                 // If Claude is not available, fall back to user's Copilot model
-                vscode.window.showInformationMessage('No Claude models are available, falling back to your configured Copilot model.');
+                vscode.window.showInformationMessage('No Claude models were detected among your available AI models. Falling back to another available model.');
             }
             
-            // Try user's configured Copilot model (will include GPT-5 if user has it configured)
-            const copilotModels = await vscode.lm.selectChatModels({
-                vendor: 'copilot'
-            });
+            // Try user's configured Copilot model if available
+            const copilotModels = allAvailableModels.filter(model =>
+                model.vendor.toLowerCase() === 'copilot' || 
+                model.name.toLowerCase().includes('gpt')
+            );
 
-            if (copilotModels.length === 0) {
-                vscode.window.showErrorMessage('No compatible language models are available. Please ensure you have the appropriate extensions installed and authenticated.');
-                return null;
+            if (copilotModels.length > 0) {
+                return copilotModels[0];
             }
-
-            return copilotModels[0];
+            
+            // If no specific models were found, use the first available model
+            return allAvailableModels[0];
         } catch (error) {
             vscode.window.showErrorMessage('Failed to access language models. Please ensure you have the required extensions installed and are authenticated.');
             return null;
@@ -188,8 +206,19 @@ ${commit.diff}
 
     private handleError(operation: string, error: unknown): null {
         console.error(`Error ${operation} with AI model:`, error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        vscode.window.showErrorMessage(`Failed to ${operation}: ${errorMessage}`);
+        
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+            
+            // Add Claude-specific error message handling
+            if (errorMessage.includes('anthropic') || errorMessage.includes('claude')) {
+                vscode.window.showErrorMessage(`Claude model error while ${operation}: ${errorMessage}. Please verify that Claude is properly configured and authenticated.`);
+                return null;
+            }
+        }
+        
+        vscode.window.showErrorMessage(`Failed to ${operation}: ${errorMessage}. Try selecting a different AI model in settings.`);
         return null;
     }
 
@@ -210,16 +239,65 @@ ${commit.diff}
     }
 
     private extractJsonFromResponse(response: string): any | null {
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        try {
+            // First attempt: Try to find a clean JSON block
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+            
+            // Second attempt: Look for JSON within triple backticks
+            const codeBlockMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+            if (codeBlockMatch && codeBlockMatch[1]) {
+                return JSON.parse(codeBlockMatch[1]);
+            }
+            
+            return null;
+        } catch (error) {
+            console.error("Failed to parse JSON from response:", error);
+            return null;
+        }
     }
 
     private createReviewResult(commitHash: string, parsed: any): ReviewResult {
+        // Clean up any issues to remove backticks from suggested fixes
+        const cleanedIssues = (parsed.issues || []).map((issue: ReviewIssue) => {
+            if (issue.suggestedFix) {
+                // Fix the multiline code blocks with backtick fences
+                // We'll keep the content between the fences but remove the fences themselves
+                let fixedContent = issue.suggestedFix;
+                
+                // Special handling for code blocks with language specifiers
+                const codeBlockPattern = /```([\w]*)\n([\s\S]*?)\n```/g;
+                const matches = fixedContent.match(codeBlockPattern);
+                
+                if (matches) {
+                    // For each code block found
+                    matches.forEach(match => {
+                        // Extract just the content between the backticks
+                        const innerContent = match.replace(/```[\w]*\n/, '').replace(/\n```$/, '');
+                        // Replace the entire block with just the inner content
+                        fixedContent = fixedContent.replace(match, innerContent);
+                    });
+                } else {
+                    // Fallback for simple cases
+                    fixedContent = fixedContent
+                        .replace(/^```[\w]*[\s\n]/, '')
+                        .replace(/```[\s]*$/, '')
+                        .replace(/\n```[\s]*$/, '')
+                        .trim();
+                }
+                
+                issue.suggestedFix = fixedContent;
+            }
+            return issue;
+        });
+        
         return {
             commitHash,
             summary: parsed.summary || 'Review completed',
             overallRating: parsed.overallRating || 'good',
-            issues: parsed.issues || [],
+            issues: cleanedIssues,
             suggestions: parsed.suggestions || []
         };
     }

@@ -16,6 +16,44 @@ export function displayReviewResults(reviewResult: ReviewResult): void {
     panel.webview.html = generateWebviewContent(reviewResult);
 }
 
+/**
+ * Processes code content for proper HTML display
+ * Helps with JSON, JavaScript, and other common formats
+ */
+function processCodeContent(content: string): string {
+    // Safety check
+    if (!content) return '';
+    
+    // Escape HTML to prevent injection
+    let processed = content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    // Special handling for JSON to improve readability
+    if (processed.includes('{') && processed.includes('}')) {
+        try {
+            // Try to detect if it's valid JSON
+            const jsonMatch = processed.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const jsonPart = jsonMatch[0];
+                try {
+                    // Validate and format the JSON part
+                    const formatted = JSON.stringify(JSON.parse(jsonPart), null, 2);
+                    // Replace the JSON part with formatted version
+                    processed = processed.replace(jsonPart, formatted);
+                } catch (e) {
+                    // Not valid JSON, leave as is
+                }
+            }
+        } catch (e) {
+            // If any error occurs, just use the original escaped content
+        }
+    }
+    
+    return processed;
+}
+
 function generateWebviewContent(reviewResult: ReviewResult): string {
     const severityColors = {
         high: '#ff4444',
@@ -47,7 +85,7 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
             <div class="issue-description">${issue.description}</div>
             ${issue.suggestedFix ? `<div class="suggested-fix">
                 <strong>💡 Suggested Fix:</strong>
-                <div class="fix-content">${issue.suggestedFix}</div>
+                <div class="fix-content">${processCodeContent(issue.suggestedFix)}</div>
             </div>` : ''}
             ${issue.file ? `<div class="issue-location">📁 ${issue.file}${issue.line ? ` (Line ${issue.line})` : ''}</div>` : ''}
         </div>
@@ -77,6 +115,12 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
                 color: var(--vscode-editor-foreground);
             }
             
+            /* Syntax highlighting helpers */
+            .key { color: var(--vscode-symbolIcon-keywordForeground, #569cd6); }
+            .string { color: var(--vscode-symbolIcon-stringForeground, #ce9178); }
+            .number { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); }
+            .boolean { color: var(--vscode-symbolIcon-booleanForeground, #569cd6); }
+            
             .header {
                 border-bottom: 2px solid var(--vscode-panel-border);
                 padding-bottom: 20px;
@@ -98,42 +142,42 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
                 font-weight: bold;
                 text-transform: uppercase;
                 font-size: 0.8em;
-                margin-top: 10px;
+                margin: 10px 0;
                 color: white;
             }
             
             .summary {
                 background: var(--vscode-textBlockQuote-background);
-                padding: 15px;
-                border-radius: 8px;
-                margin-bottom: 30px;
-                border-left: 4px solid var(--vscode-activityBarBadge-background);
+                border-left: 4px solid var(--vscode-textLink-foreground);
+                padding: 16px;
+                margin: 20px 0;
+                border-radius: 0 4px 4px 0;
             }
             
-            .issues-section, .suggestions-section {
-                margin-bottom: 40px;
+            .section {
+                margin: 30px 0;
             }
             
             .section-title {
-                font-size: 1.2em;
-                margin-bottom: 20px;
-                padding-bottom: 8px;
-                border-bottom: 1px solid var(--vscode-panel-border);
-                color: var(--vscode-editor-foreground);
+                font-size: 1.5em;
+                font-weight: bold;
+                margin-bottom: 15px;
+                color: var(--vscode-textLink-foreground);
             }
             
             .issue-card {
-                background: var(--vscode-editor-background);
+                background: var(--vscode-editor-inactiveSelectionBackground);
+                margin: 15px 0;
+                padding: 16px;
                 border-radius: 8px;
-                margin-bottom: 15px;
-                padding: 15px;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             
             .issue-header {
                 display: flex;
                 align-items: center;
                 margin-bottom: 10px;
+                justify-content: space-between; /* Better positioning for the badge */
             }
             
             .issue-icon {
@@ -143,15 +187,17 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
             
             .issue-type {
                 font-weight: bold;
-                margin-right: auto;
+                color: var(--vscode-textLink-foreground);
+                margin-right: auto; /* Push badge to the right */
             }
             
             .severity-badge {
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 0.8em;
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 0.7em;
                 font-weight: bold;
                 color: white;
+                margin-left: 10px;
             }
             
             .severity-high {
@@ -167,22 +213,38 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
             }
             
             .issue-description {
-                margin-bottom: 15px;
+                margin: 10px 0;
+                line-height: 1.5;
             }
             
             .suggested-fix {
-                background: var(--vscode-textBlockQuote-background);
-                padding: 10px;
-                border-radius: 4px;
-                margin-top: 10px;
-                font-family: 'Courier New', monospace;
-                white-space: pre-wrap;
+                margin-top: 12px;
+                padding: 12px;
+                background: var(--vscode-textCodeBlock-background);
+                border-radius: 6px;
+                border-left: 3px solid var(--vscode-textLink-foreground);
             }
             
             .fix-content {
-                margin-top: 5px;
-                padding-left: 10px;
-                border-left: 3px solid var(--vscode-activityBarBadge-background);
+                margin-top: 12px;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+                line-height: 1.4;
+                white-space: pre;
+                overflow-x: auto;
+                display: block;
+                width: 100%;
+                padding: 12px;
+                background-color: rgba(0, 0, 0, 0.05);
+                border-radius: 4px;
+                tab-size: 2;
+            }
+            
+            /* Style for code blocks to ensure proper indentation and formatting */
+            .fix-content {
+                position: relative;
+                color: var(--vscode-textPreformat-foreground, inherit);
+                background-color: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.05));
             }
             
             .issue-location {
@@ -193,34 +255,47 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
             
             .suggestion-item {
                 display: flex;
-                margin-bottom: 10px;
-                padding: 10px;
-                background: var(--vscode-editor-background);
-                border-radius: 4px;
+                align-items: flex-start;
+                gap: 12px;
+                margin: 12px 0;
+                padding: 12px;
+                background: var(--vscode-editor-inactiveSelectionBackground);
+                border-radius: 6px;
             }
             
             .suggestion-number {
-                background: var(--vscode-badge-background);
-                color: var(--vscode-badge-foreground);
+                background: var(--vscode-textLink-foreground);
+                color: white;
+                border-radius: 50%;
                 width: 24px;
                 height: 24px;
-                border-radius: 12px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                margin-right: 10px;
+                font-size: 0.8em;
+                font-weight: bold;
                 flex-shrink: 0;
             }
             
             .suggestion-text {
+                flex: 1;
                 line-height: 1.5;
             }
-
+            
             .no-issues {
-                padding: 15px;
-                background: var(--vscode-editor-background);
-                border-radius: 8px;
-                border-left: 4px solid #4CAF50;
+                text-align: center;
+                padding: 40px;
+                color: var(--vscode-descriptionForeground);
+                font-style: italic;
+            }
+            
+            .footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid var(--vscode-panel-border);
+                text-align: center;
+                color: var(--vscode-descriptionForeground);
+                font-style: italic;
             }
 
             @media (prefers-color-scheme: dark) {
@@ -236,26 +311,30 @@ function generateWebviewContent(reviewResult: ReviewResult): string {
     </head>
     <body>
         <div class="header">
-            <h1>Code Review for Commit</h1>
-            <div><span class="commit-hash">${reviewResult.commitHash}</span></div>
+            <h1>🔍 Code Review Results</h1>
+            <div><strong>Commit:</strong> <span class="commit-hash">${reviewResult.commitHash}</span></div>
             <div class="rating" style="background-color: ${ratingColors[reviewResult.overallRating]}">
                 ${formatRating(reviewResult.overallRating)}
             </div>
         </div>
         
-        <div class="summary">
-            <h2>Summary</h2>
-            <p>${reviewResult.summary}</p>
+        <div class="section">
+            <div class="section-title">📋 Summary</div>
+            <div class="summary">${reviewResult.summary}</div>
         </div>
         
-        <div class="issues-section">
-            <h2 class="section-title">Issues (${reviewResult.issues.length})</h2>
-            ${reviewResult.issues.length > 0 ? issuesHtml : '<div class="no-issues">No issues found in this commit. Good job!</div>'}
+        <div class="section">
+            <div class="section-title">⚠️ Issues Found (${reviewResult.issues.length})</div>
+            ${reviewResult.issues.length > 0 ? issuesHtml : '<div class="no-issues">🎉 No issues found! Great job!</div>'}
         </div>
         
-        <div class="suggestions-section">
-            <h2 class="section-title">Suggestions (${reviewResult.suggestions.length})</h2>
-            ${reviewResult.suggestions.length > 0 ? suggestionsHtml : '<div class="no-issues">No suggestions for this commit.</div>'}
+        <div class="section">
+            <div class="section-title">💡 Suggestions (${reviewResult.suggestions.length})</div>
+            ${reviewResult.suggestions.length > 0 ? suggestionsHtml : '<div class="no-issues">No additional suggestions at this time.</div>'}
+        </div>
+        
+        <div class="footer">
+            <p>Review generated by AI ✨</p>
         </div>
     </body>
     </html>`;
