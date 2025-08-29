@@ -1,52 +1,70 @@
 import * as vscode from 'vscode';
 import { getLatestCommit, checkRepositoryStatus } from '../utils/gitUtils';
-import { CopilotProvider } from '../providers/copilotProvider';
-import { displayReviewResults, showReviewSummary } from '../utils/reviewUtils';
+import { Commit, ReviewResult } from '../types';
+import { 
+    validateRepository,
+    analyzeWithCopilot, 
+    displayResults, 
+    handleError, 
+    validateReviewResult 
+} from '../utils/commitReviewService';
 
+/**
+ * Main function to handle reviewing the latest commit
+ */
 export async function reviewLatestCommit(): Promise<void> {
     // Check if we're in a git repository
-    if (!checkRepositoryStatus()) {
-        vscode.window.showErrorMessage('This command requires a Git repository. Please open a folder with a Git repository.');
+    if (!validateRepository(checkRepositoryStatus)) {
         return;
     }
 
     // Show progress indicator
-    vscode.window.withProgress({
+    await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: "Reviewing latest commit with GitHub Copilot...",
         cancellable: false
-    }, async (progress: vscode.Progress<{increment?: number; message?: string}>) => {
-        try {
-            progress.report({ increment: 20, message: "Getting latest commit..." });
-            
-            const latestCommit = await getLatestCommit();
-            if (!latestCommit) {
-                vscode.window.showErrorMessage('No commits found in the repository.');
-                return;
-            }
+    }, async (progress) => performCommitReview(progress));
+}
 
-            progress.report({ increment: 40, message: "Analyzing code with Copilot..." });
-            
-            const copilotProvider = new CopilotProvider();
-            const reviewResult = await copilotProvider.reviewCommit(latestCommit);
-
-            progress.report({ increment: 80, message: "Preparing results..." });
-
-            if (reviewResult) {
-                // Show summary notification
-                showReviewSummary(reviewResult);
-                
-                // Display detailed results in a new document
-                displayReviewResults(reviewResult);
-                
-                progress.report({ increment: 100, message: "Review completed!" });
-            } else {
-                vscode.window.showErrorMessage('Failed to perform code review. Please check that GitHub Copilot is properly configured.');
-            }
-        } catch (error) {
-            console.error('Error during code review:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            vscode.window.showErrorMessage(`Error during code review: ${errorMessage}`);
+/**
+ * Performs the review of the latest commit with progress reporting
+ * @param progress The progress object for reporting status
+ */
+async function performCommitReview(
+    progress: vscode.Progress<{increment?: number; message?: string}>
+): Promise<void> {
+    try {
+        const latestCommit = await fetchLatestCommit(progress);
+        if (!latestCommit) {
+            return; // Error already shown in fetchLatestCommit
         }
-    });
+
+        const reviewResult = await analyzeWithCopilot(latestCommit, progress);
+        if (!validateReviewResult(reviewResult)) {
+            return;
+        }
+        
+        displayResults(reviewResult, progress);
+    } catch (error) {
+        handleError(error, 'Error during code review');
+    }
+}
+
+/**
+ * Fetches the latest commit with progress reporting
+ * @param progress The progress object
+ * @returns The latest commit or null if not found
+ */
+async function fetchLatestCommit(
+    progress: vscode.Progress<{increment?: number; message?: string}>
+): Promise<Commit | null> {
+    progress.report({ increment: 20, message: "Getting latest commit..." });
+    
+    const latestCommit = await getLatestCommit();
+    if (!latestCommit) {
+        vscode.window.showErrorMessage('No commits found in the repository.');
+        return null;
+    }
+    
+    return latestCommit;
 }

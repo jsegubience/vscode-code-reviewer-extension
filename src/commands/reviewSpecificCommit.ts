@@ -1,16 +1,43 @@
 import * as vscode from 'vscode';
 import { getCommitByHash, checkRepositoryStatus } from '../utils/gitUtils';
-import { CopilotProvider } from '../providers/copilotProvider';
-import { displayReviewResults, showReviewSummary } from '../utils/reviewUtils';
+import { Commit, ReviewResult } from '../types';
+import { 
+    validateRepository,
+    getDiffTruncationLimit,
+    truncateCommitDiff,
+    analyzeWithCopilot,
+    displayResults,
+    handleError,
+    validateReviewResult
+} from '../utils/commitReviewService';
 
+/**
+ * Main function to handle reviewing specific commits
+ */
 export async function reviewSpecificCommit(): Promise<void> {
     // Check if we're in a git repository
-    if (!checkRepositoryStatus()) {
-        vscode.window.showErrorMessage('This command requires a Git repository. Please open a folder with a Git repository.');
+    if (!validateRepository(checkRepositoryStatus)) {
         return;
     }
 
-    // Prompt user for commit hashes
+    const commitHashes = await promptForCommitHashes();
+    if (!commitHashes) {
+        return; // User cancelled or no valid hashes
+    }
+
+    if (!await validateCommitCount(commitHashes)) {
+        return; // User chose not to proceed with too many commits
+    }
+
+    const diffLimit = getDiffTruncationLimit();
+    await processCommits(commitHashes, diffLimit);
+}
+
+/**
+ * Prompts the user to enter commit hashes
+ * @returns Array of commit hashes or null if cancelled/invalid
+ */
+async function promptForCommitHashes(): Promise<string[] | null> {
     const commitHashesInput = await vscode.window.showInputBox({
         prompt: 'Enter the commit hashes to review (comma-separated)',
         placeHolder: 'e.g., abc123def456, HEAD~1',
@@ -23,73 +50,79 @@ export async function reviewSpecificCommit(): Promise<void> {
     });
 
     if (!commitHashesInput) {
-        return; // User cancelled
+        return null; // User cancelled
     }
 
-    const commitHashes = commitHashesInput.split(',').map(hash => hash.trim()).filter(hash => hash.length > 0);
+    return commitHashesInput.split(',')
+        .map(hash => hash.trim())
+        .filter(hash => hash.length > 0);
+}
 
-    // Notify user if too many commits are selected
-    if (commitHashes.length > 5) {
-        const proceed = await vscode.window.showWarningMessage(
-            `You have selected ${commitHashes.length} commits. Reviewing too many commits at once may exceed token limits. Proceed?`,
-            { modal: true },
-            'Yes',
-            'No'
-        );
-        if (proceed !== 'Yes') {
-            return;
-        }
+/**
+ * Validates if the number of commits is reasonable
+ * @param commitHashes Array of commit hashes
+ * @returns True if valid/confirmed, false otherwise
+ */
+async function validateCommitCount(commitHashes: string[]): Promise<boolean> {
+    if (commitHashes.length <= 5) {
+        return true;
     }
+    
+    const proceed = await vscode.window.showWarningMessage(
+        `You have selected ${commitHashes.length} commits. Reviewing too many commits at once may exceed token limits. Proceed?`,
+        { modal: true },
+        'Yes',
+        'No'
+    );
+    
+    return proceed === 'Yes';
+}
 
-    // Get the diff truncation limit from the configuration
-    const config = vscode.workspace.getConfiguration('copilotCodeReview');
-    const diffLimit = config.get<number>('diffTruncationLimit', 5000); // Default to 5000 characters
-
+/**
+ * Processes each commit for review
+ * @param commitHashes Array of commit hashes to process
+ * @param diffLimit The maximum number of characters for diff content
+ */
+async function processCommits(commitHashes: string[], diffLimit: number): Promise<void> {
     for (const commitHash of commitHashes) {
-        // Show progress indicator for each commit
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Reviewing commit ${commitHash.substring(0, 7)} with GitHub Copilot...`,
             cancellable: false
-        }, async (progress: vscode.Progress<{increment?: number; message?: string}>) => {
-            try {
-                progress.report({ increment: 20, message: "Getting commit information..." });
+        }, (progress) => reviewSingleCommit(commitHash, diffLimit, progress));
+    }
+}
 
-                const commit = await getCommitByHash(commitHash);
-                if (!commit) {
-                    vscode.window.showErrorMessage(`Commit ${commitHash} not found.`);
-                    return;
-                }
+/**
+ * Reviews a single commit with progress reporting
+ * @param commitHash The commit hash to review
+ * @param diffLimit The maximum number of characters for diff content
+ * @param progress The progress object for reporting status
+ */
+async function reviewSingleCommit(
+    commitHash: string, 
+    diffLimit: number, 
+    progress: vscode.Progress<{increment?: number; message?: string}>
+): Promise<void> {
+    try {
+        progress.report({ increment: 20, message: "Getting commit information..." });
 
-                // Limit commit diff size to reduce token usage
-                const limitedCommit = {
-                    ...commit,
-                    diff: commit.diff.slice(0, diffLimit) // Use the configurable limit
-                };
+        const commit = await getCommitByHash(commitHash);
+        if (!commit) {
+            vscode.window.showErrorMessage(`Commit ${commitHash} not found.`);
+            return;
+        }
 
-                progress.report({ increment: 40, message: "Analyzing code with Copilot..." });
+        // Limit commit diff size to reduce token usage
+        const limitedCommit = truncateCommitDiff(commit, diffLimit);
 
-                const copilotProvider = new CopilotProvider();
-                const reviewResult = await copilotProvider.reviewCommit(limitedCommit);
-
-                progress.report({ increment: 80, message: "Preparing results..." });
-
-                if (reviewResult) {
-                    // Show summary notification
-                    showReviewSummary(reviewResult);
-
-                    // Display detailed results in a new document
-                    displayReviewResults(reviewResult);
-
-                    progress.report({ increment: 100, message: "Review completed!" });
-                } else {
-                    vscode.window.showErrorMessage('Failed to perform code review. Please check that GitHub Copilot is properly configured.');
-                }
-            } catch (error) {
-                console.error('Error during code review:', error);
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                vscode.window.showErrorMessage(`Error reviewing commit: ${errorMessage}`);
-            }
-        });
+        const reviewResult = await analyzeWithCopilot(limitedCommit, progress);
+        if (!validateReviewResult(reviewResult)) {
+            return;
+        }
+        
+        displayResults(reviewResult, progress);
+    } catch (error) {
+        handleError(error, `Error reviewing commit ${commitHash}`);
     }
 }
