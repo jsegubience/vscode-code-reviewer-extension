@@ -53,11 +53,24 @@ See the [INSTALL.md](INSTALL.md) file for detailed manual installation instructi
 The extension provides configurable settings to enhance your experience:
 
 <details>
+<summary><b>🤖 AI Model Selection</b></summary>
+
+**Setting**: Automatic
+- **Default**: Claude Sonnet (preferred), with fallback to other available AI models
+- **Purpose**: Determines which AI model is used for code reviews
+- **Behavior**: The extension automatically selects the best available model in this order:
+  1. Claude Sonnet (any version)
+  2. Other Claude models
+  3. GitHub Copilot/GPT models
+  4. Any other available language model
+</details>
+
+<details>
 <summary><b>🔧 Diff Truncation Limit</b></summary>
 
 **Setting**: `copilotCodeReview.diffTruncationLimit`
 - **Default**: 5000 characters
-- **Purpose**: Controls the maximum diff size sent to GitHub Copilot
+- **Purpose**: Controls the maximum diff size sent to the AI model
 - **Configuration**:
 ```json
 {
