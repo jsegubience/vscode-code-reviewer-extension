@@ -10,6 +10,46 @@ export class AIReviewProvider {
         performance: 'Performance: Inefficient algorithms, memory usage, and optimization opportunities',
         testing: 'Testing: Missing tests, test coverage, and test quality'
     };
+    
+    private static readonly REVIEW_SUBCATEGORIES = {
+        codeQuality: [
+            'Naming conventions (variables, functions, classes)',
+            'Code organization and structure',
+            'Comment quality and documentation',
+            'Consistent coding style',
+            'Code duplication and reusability',
+            'Readability and maintainability'
+        ],
+        bugs: [
+            'Null/undefined handling',
+            'Error handling and edge cases',
+            'Off-by-one errors',
+            'Type safety issues',
+            'Logic flaws',
+            'State management issues'
+        ],
+        security: [
+            'Input validation',
+            'Authentication and authorization',
+            'Data sanitization',
+            'Secure coding practices',
+            'Dependency vulnerabilities'
+        ],
+        performance: [
+            'Algorithm efficiency',
+            'Memory usage optimization',
+            'Unnecessary computations',
+            'Resource leaks',
+            'Bottlenecks'
+        ],
+        testing: [
+            'Code coverage gaps',
+            'Edge case testing',
+            'Mocking strategies',
+            'Test maintainability',
+            'Integration test needs'
+        ]
+    };
 
     async reviewCommit(commit: Commit): Promise<ReviewResult | null> {
         try {
@@ -19,14 +59,60 @@ export class AIReviewProvider {
             // Show which model is being used
             this.logSelectedModel(model);
 
+            // Step 1: Initial thorough review
+            vscode.window.setStatusBarMessage('Performing comprehensive code review...', 3000);
             const prompt = await this.buildReviewPrompt(commit);
             const response = await this.sendModelRequest(model, prompt);
             
-            return this.parseReviewResponse(commit.hash, response);
+            // Check if consolidation is enabled
+            const config = vscode.workspace.getConfiguration('copilotCodeReview');
+            const enableConsolidation = config.get<boolean>('enableConsolidation', true);
+            
+            if (!enableConsolidation) {
+                return this.parseReviewResponse(commit.hash, response);
+            }
+            
+            // Step 2: Consolidation pass - ensure all issues are found
+            vscode.window.setStatusBarMessage('Consolidating findings and ensuring completeness...', 3000);
+            const initialReview = this.extractJsonFromResponse(response);
+            
+            if (!initialReview) {
+                return this.parseReviewResponse(commit.hash, response);
+            }
+            
+            // Create consolidation prompt
+            const consolidationPrompt = await this.buildConsolidationPrompt(commit, initialReview);
+            const consolidatedResponse = await this.sendModelRequest(model, consolidationPrompt);
+            
+            // Use the consolidated response for the final result
+            return this.parseReviewResponse(commit.hash, consolidatedResponse);
 
         } catch (error) {
             return this.handleError('reviewing commit', error);
         }
+    }
+    
+    private async buildConsolidationPrompt(commit: Commit, initialReview: any): Promise<string> {
+        return `CONSOLIDATION AND COMPLETENESS CHECK
+
+I've completed an initial review of the following commit. Please analyze this review to ensure it's comprehensive and consistent.
+
+${this.formatCommitInfo(commit)}
+
+Initial Review Result:
+\`\`\`json
+${JSON.stringify(initialReview, null, 2)}
+\`\`\`
+
+Please perform these checks:
+1. Ensure ALL code changes have been reviewed thoroughly
+2. Verify that ALL relevant categories and subcategories have been examined
+3. Check for any missed issues or inconsistencies in recommendations
+4. Consolidate similar issues for clarity
+5. Ensure each issue has specific, actionable fixes
+6. Add any additional issues that might have been missed
+
+Return a COMPLETE and CONSOLIDATED review using the exact same JSON format as the initial review, but with any missed issues added and all findings consolidated.`;
     }
     
     /**
@@ -136,7 +222,25 @@ ${this.formatCommitInfo(commit)}
 
 ${this.formatCodingStandard(codingStandard)}
 
+${this.getSelfReviewInstructions()}
+
 ${this.getResponseFormat()}`;
+    }
+    
+    private getSelfReviewInstructions(): string {
+        return `CONSOLIDATION AND SELF-REVIEW PROCESS:
+1. First pass: Identify ALL issues in the code
+2. Second pass: Review your findings to ensure COMPLETENESS
+3. Third pass: CONSOLIDATE similar issues and ensure all categories are covered
+4. Final check: Verify ALL issues are documented with clear, actionable fixes
+
+CONSISTENCY CHECK:
+- Ensure that you have thoroughly examined EVERY line of code
+- Verify that EVERY category and relevant subcategory has been considered
+- Confirm that you have documented ALL issues found
+- Make sure that similar code patterns have consistent recommendations
+
+Remember: The goal is to produce a COMPREHENSIVE, CONSISTENT review that identifies ALL issues in the code without requiring multiple review sessions.`;
     }
     private async loadCodingStandard(): Promise<string> {
         const config = vscode.workspace.getConfiguration('copilotCodeReview');
@@ -154,11 +258,37 @@ ${this.getResponseFormat()}`;
     }
 
     private getReviewInstructions(): string {
-        return `Please perform a comprehensive code review of this Git commit. For each area below, identify specific issues AND provide concrete fixes:
+        // Build the detailed category and subcategory list
+        let detailedCategories = '';
+        Object.entries(AIReviewProvider.REVIEW_CATEGORIES).forEach(([key, description], index) => {
+            detailedCategories += `${index + 1}. **${description}**\n`;
+            
+            // Add subcategories
+            const subcategories = AIReviewProvider.REVIEW_SUBCATEGORIES[key as keyof typeof AIReviewProvider.REVIEW_SUBCATEGORIES];
+            if (subcategories) {
+                subcategories.forEach(subcat => {
+                    detailedCategories += `   - ${subcat}\n`;
+                });
+            }
+        });
 
-${Object.entries(AIReviewProvider.REVIEW_CATEGORIES)
-    .map(([key, description], index) => `${index + 1}. **${description}**`)
-    .join('\n')}`;
+        return `Please perform an EXHAUSTIVE and COMPREHENSIVE code review of this Git commit. This review must be consistent, thorough, and identify ALL possible issues.
+
+IMPORTANT REVIEW GUIDELINES:
+- Examine EVERY line of code thoroughly
+- Assess ALL aspects of each change, not just obvious issues
+- Consider ALL possible edge cases
+- Check for complex interactions between changed components
+- Consider ALL implications of the changes
+- Be consistent and methodical in your approach
+- Identify EVERY issue, no matter how small
+- Provide SPECIFIC, ACTIONABLE fixes for each issue
+
+Review each of these categories and subcategories in detail:
+
+${detailedCategories}
+
+After identifying all issues, CONSOLIDATE your findings to ensure nothing is missed. Verify that you have addressed all categories and subcategories where relevant.`;
     }
 
     private formatCommitInfo(commit: Commit): string {
@@ -186,13 +316,43 @@ ${commit.diff}
     private getResponseFormat(): string {
         return `Please provide your review in the following JSON format with SPECIFIC, ACTIONABLE fixes:
 {
-  "summary": "Brief overview of the changes and overall assessment",
+  "summary": "Comprehensive overview of the changes and thorough assessment of all aspects",
   "overallRating": "good|needs-improvement|major-issues",
+  "categoryAssessments": [
+    {
+      "category": "Code Quality",
+      "findings": "Detailed assessment of all code quality aspects examined",
+      "issueCount": 0
+    },
+    {
+      "category": "Potential Bugs",
+      "findings": "Detailed assessment of all potential bugs examined",
+      "issueCount": 0
+    },
+    {
+      "category": "Security",
+      "findings": "Detailed assessment of all security aspects examined",
+      "issueCount": 0
+    },
+    {
+      "category": "Performance",
+      "findings": "Detailed assessment of all performance aspects examined",
+      "issueCount": 0
+    },
+    {
+      "category": "Testing",
+      "findings": "Detailed assessment of all testing aspects examined",
+      "issueCount": 0
+    }
+  ],
   "issues": [
     {
       "severity": "low|medium|high",
       "type": "bug|security|performance|style|maintainability",
-      "description": "Detailed description of the issue",
+      "category": "Specific category from the main categories",
+      "subcategory": "Specific subcategory that this issue falls under",
+      "description": "Detailed description of the issue with context",
+      "impact": "Explanation of the impact this issue could have",
       "suggestedFix": "Specific code change or action to fix this issue",
       "file": "filename if applicable",
       "line": "line number if applicable"
@@ -200,7 +360,8 @@ ${commit.diff}
   ],
   "suggestions": [
     "Specific actionable improvements with example code when possible"
-  ]
+  ],
+  "reviewCompleteness": "Confirmation that all categories and subcategories have been thoroughly examined"
 }`;
     }
 
@@ -290,12 +451,37 @@ ${commit.diff}
                 
                 issue.suggestedFix = fixedContent;
             }
-            return issue;
+            
+            // Add additional information if available
+            const enhancedIssue = {
+                ...issue,
+                category: issue.category || issue.type || 'general',
+                subcategory: issue.subcategory || '',
+                impact: issue.impact || ''
+            };
+            
+            return enhancedIssue;
         });
+        
+        // Include category assessments in the summary if available
+        let enhancedSummary = parsed.summary || 'Review completed';
+        
+        if (parsed.categoryAssessments && Array.isArray(parsed.categoryAssessments)) {
+            enhancedSummary += '\n\nCategory Assessments:\n';
+            parsed.categoryAssessments.forEach((assessment: any) => {
+                if (assessment.issueCount > 0) {
+                    enhancedSummary += `\n${assessment.category}: ${assessment.findings} (${assessment.issueCount} issues found)\n`;
+                }
+            });
+            
+            if (parsed.reviewCompleteness) {
+                enhancedSummary += `\n\nReview Completeness: ${parsed.reviewCompleteness}`;
+            }
+        }
         
         return {
             commitHash,
-            summary: parsed.summary || 'Review completed',
+            summary: enhancedSummary,
             overallRating: parsed.overallRating || 'good',
             issues: cleanedIssues,
             suggestions: parsed.suggestions || []

@@ -1,8 +1,8 @@
 {
   "name": "vscode-copilot-code-review",
   "displayName": "AI Code Reviewer",
-  "description": "An extension that utilizes AI models to perform automated code reviews on Git commits.",
-  "version": "0.6.0",
+  "description": "An extension that utilizes AI models to perform comprehensive and consistent code reviews on Git commits.",
+  "version": "0.7.0",
   "publisher": "JC",
   "repository": {
     "type": "git",
@@ -71,6 +71,11 @@
           "enum": ["claude", "copilot"],
           "default": "claude",
           "description": "The preferred AI model to use for code reviews. 'claude' will try to use any available Claude model (preferring Sonnet if available), while 'copilot' will use your configured Copilot model (which may be GPT-4, GPT-5, etc.)."
+        },
+        "copilotCodeReview.enableConsolidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable a two-stage review process that consolidates findings for more consistent and comprehensive results."
         }
       }
     }

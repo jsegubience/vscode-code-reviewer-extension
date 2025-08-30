@@ -14,6 +14,7 @@ Get instant, AI-powered feedback on your code changes with comprehensive analysi
 |---------|-------------|
 | 🧠 **AI-Powered Reviews** | Uses Claude (preferred) or GitHub Copilot to analyze your code changes |
 | 🔍 **Comprehensive Analysis** | Covers code quality, security, performance, and maintainability |
+| 🔄 **Consolidated Reviews** | Two-stage review process for consistent, thorough analysis |
 | ⚡ **Instant Feedback** | Get reviews in seconds with simple hotkey commands |
 | 📝 **Detailed Reports** | Formatted markdown reports with actionable suggestions |
 | 🎯 **Flexible Targeting** | Review latest commit or specify any commit hash |
@@ -63,6 +64,16 @@ The extension provides configurable settings to enhance your experience:
   2. Other Claude models
   3. GitHub Copilot/GPT models
   4. Any other available language model
+
+**Setting**: `copilotCodeReview.enableConsolidation`
+- **Default**: true
+- **Purpose**: Enables a two-stage review process for more consistent and comprehensive results
+- **Configuration**:
+```json
+{
+  "copilotCodeReview.enableConsolidation": true
+}
+```
 </details>
 
 <details>

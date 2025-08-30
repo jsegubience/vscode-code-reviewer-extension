@@ -18,7 +18,10 @@ export interface ReviewResult {
 export interface ReviewIssue {
     severity: 'low' | 'medium' | 'high';
     type: 'bug' | 'security' | 'performance' | 'style' | 'maintainability';
+    category?: string;  // Main category this issue belongs to
+    subcategory?: string;  // Specific subcategory
     description: string;
+    impact?: string;  // Explanation of potential impact
     suggestedFix?: string;
     file?: string;
     line?: number;
